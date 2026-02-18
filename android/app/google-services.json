@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "971891419951",
+    "project_id": "windows--signin",
+    "storage_bucket": "windows--signin.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:971891419951:android:e0d79aa0dc2f624a418fda",
+        "android_client_info": {
+          "package_name": "com.example.windows_google_signin"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAAslpY5o5Eh7OO19qdiAIf210xHZat9Fc"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
