@@ -1,13 +1,13 @@
 {
   "project_info": {
-    "project_number": "971891419951",
-    "project_id": "windows--signin",
-    "storage_bucket": "windows--signin.firebasestorage.app"
+    "project_number": "777379347323",
+    "project_id": "lzprices",
+    "storage_bucket": "lzprices.firebasestorage.app"
   },
   "client": [
     {
       "client_info": {
-        "mobilesdk_app_id": "1:971891419951:android:e0d79aa0dc2f624a418fda",
+        "mobilesdk_app_id": "1:777379347323:android:a1e28c9075f78fb7ba9bde",
         "android_client_info": {
           "package_name": "com.example.windows_google_signin"
         }
@@ -15,7 +15,7 @@
       "oauth_client": [],
       "api_key": [
         {
-          "current_key": "AIzaSyAAslpY5o5Eh7OO19qdiAIf210xHZat9Fc"
+          "current_key": "AIzaSyC7_QCXK3G75vMO_rVu98u5A5OLlLEOfJQ"
         }
       ],
       "services": {

@@ -8,6 +8,7 @@ import 'dart:io' show Platform;
 import 'package:provider/provider.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:lzprices/viewmodels/search_page_view_model.dart';
+import 'package:lzprices/services/auth_service.dart';
 
 enum ShareableAttribute {
   name,
@@ -621,6 +622,17 @@ class SearchPage extends StatelessWidget {
         : _buildMobileBody(context, theme, showSearchPrompt);
 
     return Scaffold(
+      appBar: _isDesktopOrWeb ? null : AppBar(
+        title: const Text('LzPrices'),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.logout),
+            onPressed: () async {
+              await AuthService().signOut();
+            },
+          ),
+        ],
+      ),
       body: body,
     );
   }
@@ -639,6 +651,14 @@ class SearchPage extends StatelessWidget {
                   automaticallyImplyLeading: false,
                   backgroundColor: theme.colorScheme.surface,
                   title: _buildSearchField(context, theme),
+                  actions: [
+                    IconButton(
+                      icon: const Icon(Icons.logout),
+                      onPressed: () async {
+                        await AuthService().signOut();
+                      },
+                    ),
+                  ],
                 ),
                 SliverToBoxAdapter(child: _buildActiveSortChip(context)),
                 SliverToBoxAdapter(child: _buildCategoryFilters(context)),

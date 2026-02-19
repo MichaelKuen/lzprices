@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import '../services/auth_service.dart';
+import '../services/log_service.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -11,6 +12,7 @@ class LoginScreen extends StatefulWidget {
 
 class _LoginScreenState extends State<LoginScreen> {
   final AuthService _authService = AuthService();
+  final LogService _logService = LogService();
   final _formKey = GlobalKey<FormState>();
 
   // Text editing controllers
@@ -82,12 +84,32 @@ class _LoginScreenState extends State<LoginScreen> {
           _emailController.text,
           _passwordController.text,
         );
+
+        // ✅ log success
+        await _logService.logLogin(
+          email: _emailController.text,
+          success: true,
+        );
+
       } on FirebaseAuthException catch (e) {
-        setState(() {
-          _errorMessage = e.message ?? 'An unknown error occurred.';
-        });
+
+        // ❌ log failure
+        await _logService.logLogin(
+          email: _emailController.text,
+          success: false,
+          errorMessage: e.message ?? 'Unknown error',
+        );
+
+        if (mounted) {
+          setState(() {
+            _errorMessage = e.message ?? 'An unknown error occurred.';
+          });
+        }
+
       } finally {
-        setState(() => _isLoading = false);
+        if (mounted) {
+          setState(() => _isLoading = false);
+        }
       }
     }
   }

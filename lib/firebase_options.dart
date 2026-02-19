@@ -41,46 +41,47 @@ class DefaultFirebaseOptions {
   }
 
   static const FirebaseOptions web = FirebaseOptions(
-    apiKey: 'AIzaSyBAFSTRsJfKOiObilNVbz1i3RLZkiZP6KQ',
-    appId: '1:971891419951:web:c454d869fcae95d9418fda',
-    messagingSenderId: '971891419951',
-    projectId: 'windows--signin',
-    authDomain: 'windows--signin.firebaseapp.com',
-    storageBucket: 'windows--signin.firebasestorage.app',
+    apiKey: 'AIzaSyBMDSy-O2YdZtE1fsIV_0HdennY_yZVQSQ',
+    appId: '1:777379347323:web:364b336eb4c26da1ba9bde',
+    messagingSenderId: '777379347323',
+    projectId: 'lzprices',
+    authDomain: 'lzprices.firebaseapp.com',
+    storageBucket: 'lzprices.firebasestorage.app',
   );
 
   static const FirebaseOptions android = FirebaseOptions(
-    apiKey: 'AIzaSyAAslpY5o5Eh7OO19qdiAIf210xHZat9Fc',
-    appId: '1:971891419951:android:e0d79aa0dc2f624a418fda',
-    messagingSenderId: '971891419951',
-    projectId: 'windows--signin',
-    storageBucket: 'windows--signin.firebasestorage.app',
+    apiKey: 'AIzaSyC7_QCXK3G75vMO_rVu98u5A5OLlLEOfJQ',
+    appId: '1:777379347323:android:a1e28c9075f78fb7ba9bde',
+    messagingSenderId: '777379347323',
+    projectId: 'lzprices',
+    storageBucket: 'lzprices.firebasestorage.app',
   );
 
   static const FirebaseOptions ios = FirebaseOptions(
-    apiKey: 'AIzaSyBa6-xu0TUolnPK6CwsaT42faE9sSWSGYg',
-    appId: '1:971891419951:ios:6bc844c1c6983f47418fda',
-    messagingSenderId: '971891419951',
-    projectId: 'windows--signin',
-    storageBucket: 'windows--signin.firebasestorage.app',
+    apiKey: 'AIzaSyDuZuou3S799-re7x3Rsvv-2Jc4shri34A',
+    appId: '1:777379347323:ios:9dcd3bd70332ff6bba9bde',
+    messagingSenderId: '777379347323',
+    projectId: 'lzprices',
+    storageBucket: 'lzprices.firebasestorage.app',
     iosBundleId: 'com.example.windowsGoogleSignin',
   );
 
   static const FirebaseOptions macos = FirebaseOptions(
-    apiKey: 'AIzaSyBa6-xu0TUolnPK6CwsaT42faE9sSWSGYg',
-    appId: '1:971891419951:ios:6bc844c1c6983f47418fda',
-    messagingSenderId: '971891419951',
-    projectId: 'windows--signin',
-    storageBucket: 'windows--signin.firebasestorage.app',
+    apiKey: 'AIzaSyDuZuou3S799-re7x3Rsvv-2Jc4shri34A',
+    appId: '1:777379347323:ios:9dcd3bd70332ff6bba9bde',
+    messagingSenderId: '777379347323',
+    projectId: 'lzprices',
+    storageBucket: 'lzprices.firebasestorage.app',
     iosBundleId: 'com.example.windowsGoogleSignin',
   );
 
   static const FirebaseOptions windows = FirebaseOptions(
-    apiKey: 'AIzaSyBAFSTRsJfKOiObilNVbz1i3RLZkiZP6KQ',
-    appId: '1:971891419951:web:cd0975b4bbc16387418fda',
-    messagingSenderId: '971891419951',
-    projectId: 'windows--signin',
-    authDomain: 'windows--signin.firebaseapp.com',
-    storageBucket: 'windows--signin.firebasestorage.app',
+    apiKey: 'AIzaSyBMDSy-O2YdZtE1fsIV_0HdennY_yZVQSQ',
+    appId: '1:777379347323:web:cc0b5ee952e506eaba9bde',
+    messagingSenderId: '777379347323',
+    projectId: 'lzprices',
+    authDomain: 'lzprices.firebaseapp.com',
+    storageBucket: 'lzprices.firebasestorage.app',
   );
+
 }
