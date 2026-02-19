@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:lzprices/main.dart';
 import 'package:lzprices/screens/search_page.dart';
 import 'package:provider/provider.dart';
 import 'package:lzprices/services/product_sync_service.dart';

@@ -1,13 +1,13 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:lzprices/models/product.dart';
-import 'package:lzprices/services/product_sync_service.dart';
+import 'package:lzprices/repositories/product_repository.dart';
 import 'package:lzprices/service_locator.dart';
 
 enum SortOption { none, priceAsc, priceDesc }
 
 class SearchPageViewModel extends ChangeNotifier {
-  final ProductSyncService _syncService = sl<ProductSyncService>();
+  final ProductRepository _productRepository = sl<ProductRepository>();
   Timer? _debounce;
 
   List<Product> _searchResults = [];
@@ -51,7 +51,7 @@ class SearchPageViewModel extends ChangeNotifier {
     _isLoadingCategories = true;
     notifyListeners();
     try {
-      final categories = await _syncService.getProductCategories();
+      final categories = await _productRepository.getProductCategories();
       _allCategories = ['All', ...categories];
     } catch (e) {
       // Handle error
@@ -120,7 +120,7 @@ class SearchPageViewModel extends ChangeNotifier {
     notifyListeners();
 
     try {
-      List<Product> results = await _syncService.searchProducts(searchTerm,
+      List<Product> results = await _productRepository.searchProducts(searchTerm,
           categories: categoriesToSearch);
 
       if (_activeSort == SortOption.priceAsc) {
