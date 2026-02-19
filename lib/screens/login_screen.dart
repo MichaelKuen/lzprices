@@ -62,10 +62,6 @@ class _LoginScreenState extends State<LoginScreen> {
                         label: const Text("Sign In"),
                         onPressed: _signIn,
                       ),
-                TextButton(
-                  onPressed: _signUp,
-                  child: const Text('Don\'t have an account? Sign Up'),
-                )
               ],
             ),
           ),
@@ -83,28 +79,6 @@ class _LoginScreenState extends State<LoginScreen> {
 
       try {
         await _authService.signInWithEmailAndPassword(
-          _emailController.text,
-          _passwordController.text,
-        );
-      } on FirebaseAuthException catch (e) {
-        setState(() {
-          _errorMessage = e.message ?? 'An unknown error occurred.';
-        });
-      } finally {
-        setState(() => _isLoading = false);
-      }
-    }
-  }
-
-  Future<void> _signUp() async {
-    if (_formKey.currentState!.validate()) {
-      setState(() {
-        _isLoading = true;
-        _errorMessage = '';
-      });
-
-      try {
-        await _authService.signUpWithEmailAndPassword(
           _emailController.text,
           _passwordController.text,
         );
