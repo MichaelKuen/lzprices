@@ -2,27 +2,31 @@ import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:lzprices/models/product.dart';
 import 'package:lzprices/models/location.dart';
+import 'package:lzprices/config.dart';
 
 class SupabaseService {
-  SupabaseService._();
+  // Private constructor
+  SupabaseService._internal();
 
-  factory SupabaseService() {
-    return _instance;
-  }
+  // The single instance
+  static final SupabaseService _instance = SupabaseService._internal();
 
-  static final SupabaseService _instance = SupabaseService._();
+  // Factory constructor to return the instance
+  factory SupabaseService() => _instance;
 
-  Future initialize() async {
+  // Getter for the Supabase client
+  SupabaseClient get client => Supabase.instance.client;
+
+  Future<void> initialize() async {
     await Supabase.initialize(
-      url: 'https://rhtrzaqvcxtiiokxzxys.supabase.co',
-      anonKey:
-          'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJodHJ6YXF2Y3h0aWlva3h6eHlzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjI3NDUxMTcsImV4cCI6MjA3ODMyMTExN30.FV5-61tVgcSALhsV9ChX5TcxpNvQkCWlMZHunKrzu_k',
+      url: AppConfig.supabaseUrl,
+      anonKey: AppConfig.supabaseAnonKey,
     );
   }
 
   Future<void> signInWithGoogle() async {
     try {
-      await Supabase.instance.client.auth.signInWithOAuth(
+      await client.auth.signInWithOAuth(
         OAuthProvider.google,
         redirectTo: kIsWeb ? null : 'io.supabase.flutterquickstart://login-callback/',
       );
@@ -33,7 +37,7 @@ class SupabaseService {
 
   Future<DateTime?> getLatestProductTimestamp() async {
     try {
-      final response = await Supabase.instance.client.rpc('get_latest_product_timestamp');
+      final response = await client.rpc('get_latest_product_timestamp');
       if (response == null) {
         return null;
       }
@@ -46,7 +50,7 @@ class SupabaseService {
 
   Future<List<Product>> getProductsUpdatedSince(DateTime time) async {
     try {
-      final response = await Supabase.instance.client
+      final response = await client
           .from('products')
           .select()
           .eq('woo_status', 'publish')
@@ -78,7 +82,7 @@ class SupabaseService {
 
     while (hasMore) {
       try {
-        var query = Supabase.instance.client.from('products').select('*').eq('woo_status', 'publish');
+        var query = client.from('products').select('*').eq('woo_status', 'publish');
 
         if (searchTerm.isNotEmpty) {
           final lowerSearch = searchTerm.toLowerCase().trim();
@@ -162,7 +166,7 @@ class SupabaseService {
 
   Future<List<String>> getProductCategories() async {
     try {
-      final response = await Supabase.instance.client.rpc('get_unique_categories');
+      final response = await client.rpc('get_unique_categories');
       final List<dynamic> data = response as List<dynamic>;
       return data.map((dynamic item) => item['category'].toString()).toList();
     } catch (e) {
@@ -172,7 +176,7 @@ class SupabaseService {
 
   Future<List<Location>> getLocations() async {
     try {
-      final response = await Supabase.instance.client
+      final response = await client
           .from('locations')
           .select()
           .order('name', ascending: true);
@@ -193,7 +197,7 @@ class SupabaseService {
 
   Future<Product?> getProductById(String productId) async {
     try {
-      final response = await Supabase.instance.client
+      final response = await client
           .from('products')
           .select('*') // Explicitly select all columns
           .eq('id', productId)
@@ -206,7 +210,7 @@ class SupabaseService {
 
   Future<Product?> updateProduct(String productId, Map<String, dynamic> updates) async {
     try {
-      final response = await Supabase.instance.client
+      final response = await client
           .from('products')
           .update(updates)
           .eq('id', productId)
@@ -241,12 +245,12 @@ class SupabaseService {
 
   Future<List<String>> getProductImages(String productId) async {
     try {
-      final files = await Supabase.instance.client.storage
+      final files = await client.storage
           .from('product-images')
           .list(path: 'products/$productId');
       final imageUrls = files
           .map(
-            (file) => Supabase.instance.client.storage
+            (file) => client.storage
                 .from('product-images')
                 .getPublicUrl('products/$productId/${file.name}'),
           )
@@ -262,7 +266,7 @@ class SupabaseService {
     String fileName,
   ) async {
     try {
-      final result = await Supabase.instance.client.storage
+      final result = await client.storage
           .from('product-images')
           .remove(['products/$productId/$fileName']);
 
@@ -285,14 +289,14 @@ class SupabaseService {
   ) async {
     try {
       final String path = 'products/$productId/$fileName';
-      await Supabase.instance.client.storage
+      await client.storage
           .from('product-images')
           .uploadBinary(
             path,
             bytes,
             fileOptions: const FileOptions(upsert: true),
           );
-      final String publicUrl = Supabase.instance.client.storage
+      final String publicUrl = client.storage
           .from('product-images')
           .getPublicUrl(path);
       return publicUrl;

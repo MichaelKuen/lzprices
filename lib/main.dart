@@ -3,7 +3,8 @@ import 'package:firebase_core/firebase_core.dart';
 import 'package:lzprices/drift_database.dart';
 import 'package:lzprices/integrations/supabase_service.dart';
 import 'package:lzprices/screens/search_page.dart';
-import 'package:lzprices/services/product_sync_service.dart';
+import 'package:lzprices/service_locator.dart';
+import 'package:lzprices/viewmodels/search_page_view_model.dart';
 import 'package:provider/provider.dart';
 
 import 'firebase_options.dart';
@@ -18,8 +19,11 @@ void main() async {
   // Initialize the database
   db = AppDatabase();
 
+  // Setup the service locator
+  setupServiceLocator();
+
   // Initialize Supabase
-  await SupabaseService().initialize();
+  await sl<SupabaseService>().initialize();
 
   runApp(const MyApp());
 }
@@ -29,20 +33,21 @@ class MyApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return MultiProvider(
-      providers: [
-        Provider<ProductSyncService>(
-          create: (_) => ProductSyncService(),
-        ),
-      ],
-      child: MaterialApp(
-        debugShowCheckedModeBanner: false,
-        title: 'LZ Prices',
-        theme: ThemeData(
-          colorScheme: ColorScheme.fromSeed(seedColor: Colors.blue),
-          useMaterial3: true,
-        ),
-        home: const SearchPage(),
+    return MaterialApp(
+      debugShowCheckedModeBanner: false,
+      title: 'LZ Prices',
+      themeMode: ThemeMode.system,
+      theme: ThemeData(
+        colorScheme: ColorScheme.fromSeed(seedColor: Colors.blue, brightness: Brightness.light),
+        useMaterial3: true,
+      ),
+      darkTheme: ThemeData(
+        colorScheme: ColorScheme.fromSeed(seedColor: Colors.blue, brightness: Brightness.dark),
+        useMaterial3: true,
+      ),
+      home: ChangeNotifierProvider(
+        create: (context) => SearchPageViewModel(),
+        child: const SearchPage(),
       ),
     );
   }

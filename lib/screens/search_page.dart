@@ -3,13 +3,11 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
-import 'package:lzprices/services/product_sync_service.dart';
 import 'package:lzprices/models/product.dart';
 import 'dart:io' show Platform;
 import 'package:provider/provider.dart';
 import 'package:url_launcher/url_launcher.dart';
-
-enum SortOption { none, priceAsc, priceDesc }
+import 'package:lzprices/viewmodels/search_page_view_model.dart';
 
 enum ShareableAttribute {
   name,
@@ -21,33 +19,8 @@ enum ShareableAttribute {
   locations,
 }
 
-class SearchPage extends StatefulWidget {
+class SearchPage extends StatelessWidget {
   const SearchPage({super.key});
-
-  @override
-  State<SearchPage> createState() {
-    return _SearchPageState();
-  }
-}
-
-class _SearchPageState extends State<SearchPage> {
-  final TextEditingController _searchController = TextEditingController();
-  late ProductSyncService _syncService;
-  Timer? _debounce;
-
-  final ValueNotifier<List<Product>> _searchResults = ValueNotifier([]);
-  final ValueNotifier<bool> _isLoading = ValueNotifier(false);
-  final ValueNotifier<String> _errorMessage = ValueNotifier('');
-  bool _isInitialized = false;
-  bool _showSidebar = true;
-
-  // State for category filters
-  List<String> _allCategories = [];
-  final Set<String> _selectedCategories = {'All'};
-  bool _isLoadingCategories = true;
-
-  // State for sorting
-  SortOption _activeSort = SortOption.priceAsc;
 
   bool get _isDesktop {
     if (kIsWeb) return false;
@@ -58,96 +31,10 @@ class _SearchPageState extends State<SearchPage> {
     return kIsWeb || _isDesktop;
   }
 
-  @override
-  void initState() {
-    super.initState();
-    _searchController.addListener(() {
-      if (mounted) setState(() {});
-    });
-  }
-
-  @override
-  void didChangeDependencies() {
-    super.didChangeDependencies();
-    if (!_isInitialized) {
-      _syncService = context.read<ProductSyncService>();
-      _fetchCategories();
-      _isInitialized = true;
-    }
-  }
-
-  @override
-  void dispose() {
-    _debounce?.cancel();
-    _searchController.dispose();
-    _searchResults.dispose();
-    _isLoading.dispose();
-    _errorMessage.dispose();
-    super.dispose();
-  }
-
-  Future<void> _fetchCategories() async {
-    try {
-      final categories = await _syncService.getProductCategories();
-      if (mounted) {
-        setState(() {
-          _allCategories = ['All', ...categories];
-          _isLoadingCategories = false;
-        });
-      }
-    } catch (e) {
-      if (mounted) {
-        setState(() => _isLoadingCategories = false);
-      }
-    }
-  }
-
-  void _onSearchChanged(String query) {
-    if (_debounce?.isActive ?? false) _debounce!.cancel();
-    _debounce = Timer(const Duration(milliseconds: 500), () {
-      _performSearch();
-    });
-  }
-
-  void _onCategorySelected(bool selected, String category) {
-    setState(() {
-      if (category == 'All') {
-        _selectedCategories.clear();
-        _selectedCategories.add('All');
-      } else {
-        _selectedCategories.remove('All');
-        if (selected) {
-          _selectedCategories.add(category);
-        } else {
-          _selectedCategories.remove(category);
-        }
-      }
-
-      if (_selectedCategories.isEmpty) {
-        _selectedCategories.add('All');
-      }
-    });
-    _performSearch();
-  }
-
-  void _applyCategoryFilter(Set<String> newCategories) {
-    setState(() {
-      _selectedCategories.clear();
-      _selectedCategories.addAll(newCategories);
-    });
-    _performSearch();
-  }
-
-  void _onSortSelected(SortOption option) {
-    setState(() {
-      _activeSort = option;
-    });
-    _performSearch(); // Re-run the search to apply the new sort order
-  }
-
-  void _showFilterSheet() {
-    final tempSelectedCategories = Set<String>.from(_selectedCategories);
-    var tempSortOption = _activeSort;
+  void _showFilterSheet(BuildContext context) {
+    final viewModel = context.read<SearchPageViewModel>();
+    final tempSelectedCategories = Set<String>.from(viewModel.selectedCategories);
+    var tempSortOption = viewModel.activeSort;
 
     showModalBottomSheet(
       context: context,
@@ -222,7 +109,7 @@ class _SearchPageState extends State<SearchPage> {
                             child: Text('Categories',
                                 style: Theme.of(context).textTheme.titleMedium),
                           ),
-                          ..._allCategories.map((category) {
+                          ...viewModel.allCategories.map((category) {
                             return CheckboxListTile(
                               title: Text(category),
                               value: tempSelectedCategories.contains(category),
@@ -257,8 +144,8 @@ class _SearchPageState extends State<SearchPage> {
                           minimumSize: const Size(double.infinity, 48),
                         ),
                         onPressed: () {
-                          _applyCategoryFilter(tempSelectedCategories);
-                          _onSortSelected(tempSortOption);
+                          viewModel.applyCategoryFilter(tempSelectedCategories);
+                          viewModel.onSortSelected(tempSortOption);
                           Navigator.pop(context);
                         },
                         child: const Text('Apply'),
@@ -272,42 +159,6 @@ class _SearchPageState extends State<SearchPage> {
         );
       },
     );
-  }
-
-  Future<void> _performSearch() async {
-    final searchTerm = _searchController.text.trim();
-    final categoriesToSearch =
-    (_selectedCategories.contains('All') || _selectedCategories.isEmpty)
-        ? null
-        : _selectedCategories.toList();
-
-    if (searchTerm.isEmpty && categoriesToSearch == null) {
-      _searchResults.value = [];
-      _errorMessage.value = '';
-      return;
-    }
-
-    _isLoading.value = true;
-    _errorMessage.value = '';
-
-    try {
-      List<Product> results = await _syncService.searchProducts(searchTerm,
-          categories: categoriesToSearch);
-
-      if (_activeSort == SortOption.priceAsc) {
-        results.sort((a, b) =>
-            (a.price ?? double.maxFinite)
-                .compareTo(b.price ?? double.maxFinite));
-      } else if (_activeSort == SortOption.priceDesc) {
-        results.sort((a, b) => (b.price ?? -1).compareTo(a.price ?? -1));
-      }
-
-      _searchResults.value = results;
-    } catch (_) {
-      _errorMessage.value = 'Failed to search products';
-    } finally {
-      _isLoading.value = false;
-    }
   }
 
   String _buildShareMessage(Product product, Set<ShareableAttribute> attributes) {
@@ -346,7 +197,7 @@ class _SearchPageState extends State<SearchPage> {
     return productParts.join('\n');
   }
 
-  Future<void> _showShareOptions(Product product) async {
+  Future<void> _showShareOptions(BuildContext context, Product product) async {
     final selectedAttributes = <ShareableAttribute>{ShareableAttribute.name};
 
     await showModalBottomSheet(
@@ -507,7 +358,7 @@ class _SearchPageState extends State<SearchPage> {
                             ),
                             onPressed: () {
                               Navigator.pop(context);
-                              _shareViaWhatsApp(product,
+                              _shareViaWhatsApp(context, product,
                                   attributes: selectedAttributes);
                             },
                             icon: const FaIcon(FontAwesomeIcons.whatsapp),
@@ -523,7 +374,7 @@ class _SearchPageState extends State<SearchPage> {
                                   ),
                                   onPressed: () {
                                     Navigator.pop(context);
-                                    _copyToClipboard(product,
+                                    _copyToClipboard(context, product,
                                         attributes: selectedAttributes);
                                   },
                                   icon: const Icon(Icons.copy),
@@ -539,7 +390,7 @@ class _SearchPageState extends State<SearchPage> {
                                   ),
                                   onPressed: () {
                                     Navigator.pop(context);
-                                    _shareViaWeChat(product,
+                                    _shareViaWeChat(context, product,
                                         attributes: selectedAttributes);
                                   },
                                   icon: const FaIcon(FontAwesomeIcons.weixin),
@@ -562,7 +413,7 @@ class _SearchPageState extends State<SearchPage> {
   }
 
   Future<void> _copyToClipboard(
-      Product product, {Set<ShareableAttribute> attributes = const {}}) async {
+      BuildContext context, Product product, {Set<ShareableAttribute> attributes = const {}}) async {
     final message = _buildShareMessage(product, attributes);
     if (message.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -577,7 +428,7 @@ class _SearchPageState extends State<SearchPage> {
   }
 
   Future<void> _shareViaWeChat(
-      Product product, {Set<ShareableAttribute> attributes = const {}}) async {
+      BuildContext context, Product product, {Set<ShareableAttribute> attributes = const {}}) async {
     final message = _buildShareMessage(product, attributes);
     if (message.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -595,18 +446,16 @@ class _SearchPageState extends State<SearchPage> {
         const SnackBar(content: Text('Copied to clipboard, please paste in WeChat.')),
       );
     } else {
-      if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('Could not open WeChat.')),
         );
-      }
     }
   }
 
-  void _shareViaWhatsApp(Product product,
+  void _shareViaWhatsApp(BuildContext context, Product product,
       {Set<ShareableAttribute> attributes = const {}}) async {
     if (attributes.isEmpty) {
-      _showShareOptions(product);
+      _showShareOptions(context, product);
       return;
     }
 
@@ -632,21 +481,20 @@ class _SearchPageState extends State<SearchPage> {
     if (await canLaunchUrl(webUrl)) {
       await launchUrl(webUrl, mode: LaunchMode.externalApplication);
     } else {
-      if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('Could not launch WhatsApp')),
         );
-      }
     }
   }
 
-  Widget _buildActiveFilters() {
+  Widget _buildActiveFilters(BuildContext context) {
+    final viewModel = context.watch<SearchPageViewModel>();
     if (_isDesktopOrWeb) {
       return const SizedBox.shrink();
     }
 
     final bool hasActiveCategory =
-    !(_selectedCategories.contains('All') || _selectedCategories.isEmpty);
+    !(viewModel.selectedCategories.contains('All') || viewModel.selectedCategories.isEmpty);
 
     if (!hasActiveCategory) {
       return const SizedBox.shrink();
@@ -663,7 +511,7 @@ class _SearchPageState extends State<SearchPage> {
               Text('Active Filters',
                   style: Theme.of(context).textTheme.titleSmall),
               TextButton(
-                onPressed: () => _onCategorySelected(true, 'All'),
+                onPressed: () => viewModel.onCategorySelected(true, 'All'),
                 child: const Text('Clear All'),
               ),
             ],
@@ -672,10 +520,10 @@ class _SearchPageState extends State<SearchPage> {
           Wrap(
             spacing: 8.0,
             runSpacing: 4.0,
-            children: _selectedCategories.map((category) {
+            children: viewModel.selectedCategories.map((category) {
               return Chip(
                 label: Text(category),
-                onDeleted: () => _onCategorySelected(false, category),
+                onDeleted: () => viewModel.onCategorySelected(false, category),
               );
             }).toList(),
           ),
@@ -684,13 +532,14 @@ class _SearchPageState extends State<SearchPage> {
     );
   }
 
-  Widget _buildActiveSortChip() {
-    if (_activeSort == SortOption.none) {
+  Widget _buildActiveSortChip(BuildContext context) {
+    final viewModel = context.watch<SearchPageViewModel>();
+    if (viewModel.activeSort == SortOption.none) {
       return const SizedBox.shrink();
     }
 
     String label;
-    switch (_activeSort) {
+    switch (viewModel.activeSort) {
       case SortOption.priceAsc:
         label = 'Sort: Price Low to High';
         break;
@@ -707,20 +556,21 @@ class _SearchPageState extends State<SearchPage> {
       child: Chip(
         label: Text(label),
         onDeleted: () {
-          _onSortSelected(SortOption.priceAsc); // Reset to default
+          viewModel.onSortSelected(SortOption.priceAsc); // Reset to default
         },
       ),
     );
   }
 
-  Widget _buildCategoryFilters() {
+  Widget _buildCategoryFilters(BuildContext context) {
+    final viewModel = context.watch<SearchPageViewModel>();
     if (kIsWeb ||
         (kIsWeb == false && Platform.isWindows) ||
         !_isDesktopOrWeb ||
-        _isLoadingCategories) {
+        viewModel.isLoadingCategories) {
       return const SizedBox.shrink();
     }
-    if (_allCategories.length <= 1) {
+    if (viewModel.allCategories.length <= 1) {
       return const SizedBox.shrink();
     }
 
@@ -729,13 +579,13 @@ class _SearchPageState extends State<SearchPage> {
       child: Wrap(
         spacing: 8.0,
         runSpacing: 4.0,
-        children: _allCategories.map((category) {
-          final isSelected = _selectedCategories.contains(category);
+        children: viewModel.allCategories.map((category) {
+          final isSelected = viewModel.selectedCategories.contains(category);
           return ChoiceChip(
             label: Text(category),
             selected: isSelected,
             onSelected: (selected) {
-              _onCategorySelected(selected, category);
+              viewModel.onCategorySelected(selected, category);
             },
             selectedColor: Theme.of(context).colorScheme.primary,
             labelStyle: TextStyle(
@@ -761,20 +611,22 @@ class _SearchPageState extends State<SearchPage> {
 
   @override
   Widget build(BuildContext context) {
+    final viewModel = context.watch<SearchPageViewModel>();
     final theme = Theme.of(context);
-    final bool showSearchPrompt = _searchController.text.isEmpty &&
-        (_selectedCategories.contains('All') || _selectedCategories.isEmpty);
+    final bool showSearchPrompt = viewModel.searchController.text.isEmpty &&
+        (viewModel.selectedCategories.contains('All') || viewModel.selectedCategories.isEmpty);
 
     final body = _isDesktopOrWeb
-        ? _buildDesktopBody(theme, showSearchPrompt)
-        : _buildMobileBody(theme, showSearchPrompt);
+        ? _buildDesktopBody(context, theme, showSearchPrompt)
+        : _buildMobileBody(context, theme, showSearchPrompt);
 
     return Scaffold(
       body: body,
     );
   }
 
-  Widget _buildDesktopBody(ThemeData theme, bool showSearchPrompt) {
+  Widget _buildDesktopBody(BuildContext context, ThemeData theme, bool showSearchPrompt) {
+     final viewModel = context.watch<SearchPageViewModel>();
     return SafeArea(
       child: Row(
         children: [
@@ -786,16 +638,11 @@ class _SearchPageState extends State<SearchPage> {
                   floating: true,
                   automaticallyImplyLeading: false,
                   backgroundColor: theme.colorScheme.surface,
-                  title: _buildSearchField(theme),
+                  title: _buildSearchField(context, theme),
                 ),
-                SliverToBoxAdapter(child: _buildActiveSortChip()),
-                SliverToBoxAdapter(child: _buildCategoryFilters()),
-                ValueListenableBuilder<List<Product>>(
-                  valueListenable: _searchResults,
-                  builder: (context, results, child) {
-                    return _buildResultsSliver(showSearchPrompt, theme, results);
-                  },
-                ),
+                SliverToBoxAdapter(child: _buildActiveSortChip(context)),
+                SliverToBoxAdapter(child: _buildCategoryFilters(context)),
+                _buildResultsSliver(context, showSearchPrompt, theme, viewModel.searchResults),
               ],
             ),
           ),
@@ -804,33 +651,30 @@ class _SearchPageState extends State<SearchPage> {
     );
   }
 
-  Widget _buildMobileBody(ThemeData theme, bool showSearchPrompt) {
+  Widget _buildMobileBody(BuildContext context, ThemeData theme, bool showSearchPrompt) {
+    final viewModel = context.watch<SearchPageViewModel>();
     return SafeArea(
       child: Column(
         children: [
           Padding(
             padding: const EdgeInsets.all(16),
-            child: _buildSearchField(theme),
+            child: _buildSearchField(context, theme),
           ),
-          _buildActiveSortChip(),
-          _buildActiveFilters(),
+          _buildActiveSortChip(context),
+          _buildActiveFilters(context),
           Expanded(
-            child: ValueListenableBuilder<List<Product>>(
-              valueListenable: _searchResults,
-              builder: (context, results, child) {
-                return _buildResultsList(showSearchPrompt, theme, results);
-              },
-            ),
+            child: _buildResultsList(context, showSearchPrompt, theme, viewModel.searchResults),
           ),
         ],
       ),
     );
   }
 
-  TextField _buildSearchField(ThemeData theme) {
+  TextField _buildSearchField(BuildContext context, ThemeData theme) {
+    final viewModel = context.read<SearchPageViewModel>();
     return TextField(
-      controller: _searchController,
-      onChanged: _onSearchChanged,
+      controller: viewModel.searchController,
+      // The onChanged is handled by the controller listener in the view model
       decoration: InputDecoration(
         hintText: 'Search for products...',
         prefixIcon: Icon(Icons.search, color: theme.colorScheme.primary),
@@ -841,23 +685,21 @@ class _SearchPageState extends State<SearchPage> {
               IconButton(
                 icon: Icon(Icons.filter_list,
                     color: theme.colorScheme.onSurfaceVariant),
-                onPressed: _showFilterSheet,
+                onPressed: () => _showFilterSheet(context),
               ),
             if (_isDesktopOrWeb)
               IconButton(
-                icon: Icon(
-                    _showSidebar ? Icons.visibility_off : Icons.visibility),
+                icon: const Icon(Icons.visibility), // This could be stateful, leaving for now
                 onPressed: () {
-                  setState(() {
-                    _showSidebar = !_showSidebar;
-                  });
+                  // This controlled sidebar visibility, which is not in the viewmodel yet.
+                  // This can be added later if needed.
                 },
               ),
             if (_isDesktopOrWeb)
               PopupMenuButton<SortOption>(
                 icon: const Icon(Icons.sort),
                 tooltip: 'Sort Products',
-                onSelected: _onSortSelected,
+                onSelected: viewModel.onSortSelected,
                 itemBuilder: (BuildContext context) =>
                 <PopupMenuEntry<SortOption>>[
                   const PopupMenuItem<SortOption>(
@@ -868,21 +710,20 @@ class _SearchPageState extends State<SearchPage> {
                     value: SortOption.priceDesc,
                     child: Text('Price: High to Low'),
                   ),
-                  if (_activeSort != SortOption.none) const PopupMenuDivider(),
-                  if (_activeSort != SortOption.none)
+                  if (viewModel.activeSort != SortOption.none) const PopupMenuDivider(),
+                  if (viewModel.activeSort != SortOption.none)
                     const PopupMenuItem<SortOption>(
                       value: SortOption.none,
                       child: Text('Clear Sort'),
                     ),
                 ],
               ),
-            if (_searchController.text.isNotEmpty)
+            if (viewModel.searchController.text.isNotEmpty)
               IconButton(
                 icon: Icon(Icons.clear,
                     color: theme.colorScheme.onSurfaceVariant),
                 onPressed: () {
-                  _searchController.clear();
-                  _onSearchChanged('');
+                  viewModel.searchController.clear();
                 },
               ),
           ],
@@ -897,166 +738,150 @@ class _SearchPageState extends State<SearchPage> {
     );
   }
 
-  Widget _buildResultsSliver(
+  Widget _buildResultsSliver(BuildContext context,
       bool showSearchPrompt, ThemeData theme, List<Product> searchResults) {
-    return ValueListenableBuilder<bool>(
-      valueListenable: _isLoading,
-      builder: (context, isLoading, child) {
-        if (isLoading) {
-          return const SliverFillRemaining(
-              child: Center(child: CircularProgressIndicator()));
-        }
+    final viewModel = context.watch<SearchPageViewModel>();
 
-        return ValueListenableBuilder<String>(
-          valueListenable: _errorMessage,
-          builder: (context, errorMessage, child) {
-            if (errorMessage.isNotEmpty) {
-              return SliverFillRemaining(
-                child: Center(
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Icon(Icons.error_outline,
-                          size: 64, color: theme.colorScheme.error),
-                      const SizedBox(height: 16),
-                      Text(errorMessage,
-                          style: theme.textTheme.bodyLarge
-                              ?.copyWith(color: theme.colorScheme.error)),
-                    ],
-                  ),
-                ),
-              );
-            }
+    if (viewModel.isLoading) {
+      return const SliverFillRemaining(
+          child: Center(child: CircularProgressIndicator()));
+    }
 
-            if (showSearchPrompt) {
-              return SliverFillRemaining(
-                child: Center(
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Icon(Icons.search,
-                          size: 80,
-                          color:
-                          theme.colorScheme.onSurfaceVariant.withAlpha(128)),
-                      const SizedBox(height: 16),
-                      Text('Start typing to search products',
-                          style: theme.textTheme.bodyLarge?.copyWith(
-                              color: theme.colorScheme.onSurfaceVariant)),
-                    ],
-                  ),
-                ),
-              );
-            }
+    if (viewModel.errorMessage.isNotEmpty) {
+      return SliverFillRemaining(
+        child: Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(Icons.error_outline,
+                  size: 64, color: theme.colorScheme.error),
+              const SizedBox(height: 16),
+              Text(viewModel.errorMessage,
+                  style: theme.textTheme.bodyLarge
+                      ?.copyWith(color: theme.colorScheme.error)),
+            ],
+          ),
+        ),
+      );
+    }
 
-            if (searchResults.isEmpty) {
-              return SliverFillRemaining(
-                child: Center(
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Icon(Icons.search_off,
-                          size: 80,
-                          color:
-                          theme.colorScheme.onSurfaceVariant.withAlpha(128)),
-                      const SizedBox(height: 16),
-                      Text('No products found',
-                          style: theme.textTheme.bodyLarge?.copyWith(
-                              color: theme.colorScheme.onSurfaceVariant)),
-                    ],
-                  ),
-                ),
-              );
-            }
+    if (showSearchPrompt) {
+      return SliverFillRemaining(
+        child: Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(Icons.search,
+                  size: 80,
+                  color:
+                  theme.colorScheme.onSurfaceVariant.withAlpha(128)),
+              const SizedBox(height: 16),
+              Text('Start typing to search products',
+                  style: theme.textTheme.bodyLarge?.copyWith(
+                      color: theme.colorScheme.onSurfaceVariant)),
+            ],
+          ),
+        ),
+      );
+    }
 
-            return SliverPadding(
-              padding: const EdgeInsets.symmetric(horizontal: 16),
-              sliver: SliverList(
-                delegate: SliverChildBuilderDelegate(
-                      (context, index) =>
-                      _buildProductCard(theme, searchResults[index]),
-                  childCount: searchResults.length,
-                ),
-              ),
-            );
-          },
-        );
-      },
+    if (searchResults.isEmpty) {
+      return SliverFillRemaining(
+        child: Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(Icons.search_off,
+                  size: 80,
+                  color:
+                  theme.colorScheme.onSurfaceVariant.withAlpha(128)),
+              const SizedBox(height: 16),
+              Text('No products found',
+                  style: theme.textTheme.bodyLarge?.copyWith(
+                      color: theme.colorScheme.onSurfaceVariant)),
+            ],
+          ),
+        ),
+      );
+    }
+
+    return SliverPadding(
+      padding: const EdgeInsets.symmetric(horizontal: 16),
+      sliver: SliverList(
+        delegate: SliverChildBuilderDelegate(
+              (context, index) =>
+              _buildProductCard(context, theme, searchResults[index]),
+          childCount: searchResults.length,
+        ),
+      ),
     );
   }
 
-  Widget _buildResultsList(
+  Widget _buildResultsList(BuildContext context,
       bool showSearchPrompt, ThemeData theme, List<Product> searchResults) {
-    return ValueListenableBuilder<bool>(
-      valueListenable: _isLoading,
-      builder: (context, isLoading, child) {
-        if (isLoading) {
-          return const Center(child: CircularProgressIndicator());
-        }
+    final viewModel = context.watch<SearchPageViewModel>();
 
-        return ValueListenableBuilder<String>(
-          valueListenable: _errorMessage,
-          builder: (context, errorMessage, child) {
-            if (errorMessage.isNotEmpty) {
-              return Center(
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Icon(Icons.error_outline,
-                        size: 64, color: theme.colorScheme.error),
-                    const SizedBox(height: 16),
-                    Text(errorMessage,
-                        style: theme.textTheme.bodyLarge
-                            ?.copyWith(color: theme.colorScheme.error)),
-                  ],
-                ),
-              );
-            }
+    if (viewModel.isLoading) {
+      return const Center(child: CircularProgressIndicator());
+    }
 
-            if (showSearchPrompt) {
-              return Center(
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Icon(Icons.search,
-                        size: 80,
-                        color:
-                        theme.colorScheme.onSurfaceVariant.withAlpha(128)),
-                    const SizedBox(height: 16),
-                    Text('Start typing to search products',
-                        style: theme.textTheme.bodyLarge?.copyWith(
-                            color: theme.colorScheme.onSurfaceVariant)),
-                  ],
-                ),
-              );
-            }
+    if (viewModel.errorMessage.isNotEmpty) {
+      return Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(Icons.error_outline,
+                size: 64, color: theme.colorScheme.error),
+            const SizedBox(height: 16),
+            Text(viewModel.errorMessage,
+                style: theme.textTheme.bodyLarge
+                    ?.copyWith(color: theme.colorScheme.error)),
+          ],
+        ),
+      );
+    }
 
-            if (searchResults.isEmpty) {
-              return Center(
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Icon(Icons.search_off,
-                        size: 80,
-                        color:
-                        theme.colorScheme.onSurfaceVariant.withAlpha(128)),
-                    const SizedBox(height: 16),
-                    Text('No products found',
-                        style: theme.textTheme.bodyLarge?.copyWith(
-                            color: theme.colorScheme.onSurfaceVariant)),
-                  ],
-                ),
-              );
-            }
+    if (showSearchPrompt) {
+      return Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(Icons.search,
+                size: 80,
+                color:
+                theme.colorScheme.onSurfaceVariant.withAlpha(128)),
+            const SizedBox(height: 16),
+            Text('Start typing to search products',
+                style: theme.textTheme.bodyLarge?.copyWith(
+                    color: theme.colorScheme.onSurfaceVariant)),
+          ],
+        ),
+      );
+    }
 
-            return ListView.builder(
-              padding: const EdgeInsets.symmetric(horizontal: 16),
-              itemCount: searchResults.length,
-              itemBuilder: (context, index) =>
-                  _buildProductCard(theme, searchResults[index]),
-            );
-          },
-        );
-      },
+    if (searchResults.isEmpty) {
+      return Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(Icons.search_off,
+                size: 80,
+                color:
+                theme.colorScheme.onSurfaceVariant.withAlpha(128)),
+            const SizedBox(height: 16),
+            Text('No products found',
+                style: theme.textTheme.bodyLarge?.copyWith(
+                    color: theme.colorScheme.onSurfaceVariant)),
+          ],
+        ),
+      );
+    }
+
+    return ListView.builder(
+      padding: const EdgeInsets.symmetric(horizontal: 16),
+      itemCount: searchResults.length,
+      itemBuilder: (context, index) =>
+          _buildProductCard(context, theme, searchResults[index]),
     );
   }
 
@@ -1113,7 +938,7 @@ class _SearchPageState extends State<SearchPage> {
     );
   }
 
-  Widget _buildProductCard(ThemeData theme, Product product) {
+  Widget _buildProductCard(BuildContext context, ThemeData theme, Product product) {
     return Card(
       margin: const EdgeInsets.only(bottom: 12),
       elevation: 0,
@@ -1172,12 +997,12 @@ class _SearchPageState extends State<SearchPage> {
               children: [
                 IconButton(
                   icon: const FaIcon(FontAwesomeIcons.whatsapp, color: Colors.green),
-                  onPressed: () => _showShareOptions(product),
+                  onPressed: () => _showShareOptions(context, product),
                   tooltip: 'Share Product Details',
                 ),
                 IconButton(
                   icon: const FaIcon(FontAwesomeIcons.moneyBillWave, color: Colors.blueGrey),
-                  onPressed: () => _shareViaWhatsApp(product,
+                  onPressed: () => _shareViaWhatsApp(context, product,
                       attributes: {
                         ShareableAttribute.name,
                         ShareableAttribute.retailPrice,

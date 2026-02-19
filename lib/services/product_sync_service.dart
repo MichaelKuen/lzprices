@@ -5,21 +5,17 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:lzprices/models/product.dart';
 import 'package:collection/collection.dart';
 import 'package:http/http.dart' as http;
+import 'package:lzprices/service_locator.dart';
 
 class ProductSyncService {
-  // The constructor is now public, allowing for multiple instances.
-  ProductSyncService()
-      : _localStorage = LocalStorageService(),
-        _supabase = SupabaseService();
-
-  final LocalStorageService _localStorage;
-  final SupabaseService _supabase;
+  final LocalStorageService _localStorage = sl<LocalStorageService>();
+  final SupabaseService _supabase = sl<SupabaseService>();
 
   bool _isSyncing = false;
 
   Future<bool> get isOnline async {
     try {
-      await Supabase.instance.client.from('products').select('id').limit(1);
+      await _supabase.client.from('products').select('id').limit(1);
       return true;
     } catch (e) {
       return false;
@@ -208,10 +204,10 @@ class ProductSyncService {
         }
         return product;
       } catch (e) {
-        return await _localStorage.getProductById(productId);
+        return _localStorage.getProductById(productId);
       }
     } else {
-      return await _localStorage.getProductById(productId);
+      return _localStorage.getProductById(productId);
     }
   }
 
