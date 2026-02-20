@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -9,6 +10,8 @@ import 'package:provider/provider.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:lzprices/viewmodels/search_page_view_model.dart';
 import 'package:lzprices/services/auth_service.dart';
+import 'package:lzprices/screens/settings_screen.dart';
+import 'package:lzprices/services/settings_service.dart';
 
 enum ShareableAttribute {
   name,
@@ -20,8 +23,57 @@ enum ShareableAttribute {
   locations,
 }
 
-class SearchPage extends StatelessWidget {
+class SearchPage extends StatefulWidget {
   const SearchPage({super.key});
+
+  @override
+  State<SearchPage> createState() => _SearchPageState();
+}
+
+class _SearchPageState extends State<SearchPage> {
+  final SettingsService _settingsService = SettingsService();
+  bool _isAdmin = false;
+  bool _isRetail = false;
+  bool _isInstaller = false;
+  bool _isWholesale = false;
+
+  bool _canViewRetail = false;
+  bool _canViewInstaller = false;
+  bool _canViewWholesale = false;
+  bool _canViewSku = false;
+  bool _canViewQuantity = false;
+  bool _canViewLocations = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _checkUserPermissions();
+  }
+
+  Future<void> _checkUserPermissions() async {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null || user.email == null) return;
+
+    final email = user.email!.toLowerCase();
+    final isAdmin = await _settingsService.isUserAdmin(email);
+    final retailUsers = await _settingsService.getUsersForRole(SettingsService.retailPriceUsersKey);
+    final installerUsers = await _settingsService.getUsersForRole(SettingsService.installerPriceUsersKey);
+    final wholesaleUsers = await _settingsService.getUsersForRole(SettingsService.wholesalePriceUsersKey);
+
+    setState(() {
+      _isAdmin = isAdmin;
+      _isRetail = retailUsers.contains(email);
+      _isInstaller = installerUsers.contains(email);
+      _isWholesale = wholesaleUsers.contains(email);
+
+      _canViewRetail = _isRetail || _isInstaller || _isWholesale || _isAdmin;
+      _canViewInstaller = _isInstaller || _isWholesale || _isAdmin;
+      _canViewWholesale = _isWholesale || _isAdmin;
+      _canViewSku = _isWholesale || _isAdmin;
+      _canViewQuantity = _isAdmin;
+      _canViewLocations = _isAdmin;
+    });
+  }
 
   bool get _isDesktop {
     if (kIsWeb) return false;
@@ -200,6 +252,13 @@ class SearchPage extends StatelessWidget {
 
   Future<void> _showShareOptions(BuildContext context, Product product) async {
     final selectedAttributes = <ShareableAttribute>{ShareableAttribute.name};
+    if (_canViewRetail) selectedAttributes.add(ShareableAttribute.retailPrice);
+    if (_canViewInstaller) selectedAttributes.add(ShareableAttribute.installerPrice);
+    if (_canViewWholesale) selectedAttributes.add(ShareableAttribute.wholesalePrice);
+    if (_canViewSku) selectedAttributes.add(ShareableAttribute.sku);
+    if (_canViewQuantity) selectedAttributes.add(ShareableAttribute.quantity);
+    if (_canViewLocations) selectedAttributes.add(ShareableAttribute.locations);
+
 
     await showModalBottomSheet(
       context: context,
@@ -242,7 +301,7 @@ class SearchPage extends StatelessWidget {
                               });
                             },
                           ),
-                          if (product.sku != null)
+                          if (product.sku != null && _canViewSku)
                             CheckboxListTile(
                               title: const Text('SKU'),
                               value: selectedAttributes
@@ -259,7 +318,7 @@ class SearchPage extends StatelessWidget {
                                 });
                               },
                             ),
-                          if (product.quantity != null)
+                          if (product.quantity != null && _canViewQuantity)
                             CheckboxListTile(
                               title: const Text('Quantity'),
                               value: selectedAttributes
@@ -276,7 +335,7 @@ class SearchPage extends StatelessWidget {
                                 });
                               },
                             ),
-                          if (product.price != null)
+                          if (product.price != null && _canViewRetail)
                             CheckboxListTile(
                               title: const Text('Retail Price'),
                               value: selectedAttributes
@@ -293,7 +352,7 @@ class SearchPage extends StatelessWidget {
                                 });
                               },
                             ),
-                          if (product.installerPrice != null)
+                          if (product.installerPrice != null && _canViewInstaller)
                             CheckboxListTile(
                               title: const Text('Installer Price'),
                               value: selectedAttributes
@@ -310,7 +369,7 @@ class SearchPage extends StatelessWidget {
                                 });
                               },
                             ),
-                          if (product.wholesalePrice != null)
+                          if (product.wholesalePrice != null && _canViewWholesale)
                             CheckboxListTile(
                               title: const Text('Wholesale Price'),
                               value: selectedAttributes
@@ -328,7 +387,7 @@ class SearchPage extends StatelessWidget {
                               },
                             ),
                           if (product.locations != null &&
-                              product.locations!.isNotEmpty)
+                              product.locations!.isNotEmpty && _canViewLocations)
                             CheckboxListTile(
                               title: const Text('Locations'),
                               value: selectedAttributes
@@ -625,6 +684,16 @@ class SearchPage extends StatelessWidget {
       appBar: _isDesktopOrWeb ? null : AppBar(
         title: const Text('LzPrices'),
         actions: [
+          if (_isAdmin)
+            IconButton(
+              icon: const Icon(Icons.settings),
+              onPressed: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (context) => const SettingsScreen()),
+                ).then((_) => _checkUserPermissions());
+              },
+            ),
           IconButton(
             icon: const Icon(Icons.logout),
             onPressed: () async {
@@ -652,6 +721,16 @@ class SearchPage extends StatelessWidget {
                   backgroundColor: theme.colorScheme.surface,
                   title: _buildSearchField(context, theme),
                   actions: [
+                    if (_isAdmin)
+                      IconButton(
+                        icon: const Icon(Icons.settings),
+                        onPressed: () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(builder: (context) => const SettingsScreen()),
+                          ).then((_) => _checkUserPermissions());
+                        },
+                      ),
                     IconButton(
                       icon: const Icon(Icons.logout),
                       onPressed: () async {
@@ -977,41 +1056,42 @@ class SearchPage extends StatelessWidget {
                     style: theme.textTheme.titleMedium
                         ?.copyWith(fontWeight: FontWeight.bold),
                   ),
-                  if (product.sku != null)
+                  if (product.sku != null && _canViewSku)
                     Padding(
                       padding: const EdgeInsets.only(top: 4.0),
                       child: Text('SKU: ${product.sku}', style: theme.textTheme.bodySmall),
                     ),
-                  if (product.quantity != null)
+                  if (product.quantity != null && _canViewQuantity)
                     Padding(
                       padding: const EdgeInsets.only(top: 4.0),
                       child: Text('Quantity: ${product.quantity}', style: theme.textTheme.bodySmall),
                     ),
                   const SizedBox(height: 8),
-                  if (product.price != null)
+                  if (product.price != null && _canViewRetail)
                     Text(
                       'Retail: R${product.price?.toStringAsFixed(2)}',
                       style: theme.textTheme.bodySmall?.copyWith(
                           color: theme.colorScheme.primary),
                     ),
-                  if (product.installerPrice != null)
+                  if (product.installerPrice != null && _canViewInstaller)
                     Text(
                       'Installer: R${product.installerPrice?.toStringAsFixed(2)}',
                       style: theme.textTheme.bodySmall?.copyWith(
                           color: theme.colorScheme.secondary),
                     ),
-                  if (product.wholesalePrice != null)
+                  if (product.wholesalePrice != null && _canViewWholesale)
                     Text(
                       'Wholesale: R${product.wholesalePrice?.toStringAsFixed(2)}',
                       style: theme.textTheme.bodySmall?.copyWith(
                           color: theme.colorScheme.tertiary),
                     ),
                   if (product.locations != null &&
-                      product.locations!.isNotEmpty)
+                      product.locations!.isNotEmpty && _canViewLocations)
                     _buildLocationChips(theme, product.locations!),
                 ],
               ),
             ),
+            if (_isAdmin)
             Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [

@@ -18,14 +18,32 @@ class _LoginScreenState extends State<LoginScreen> {
   // Text editing controllers
   final TextEditingController _emailController = TextEditingController();
   final TextEditingController _passwordController = TextEditingController();
+  final FocusNode _passwordFocusNode = FocusNode();
+  final FocusNode _signInButtonFocusNode = FocusNode();
 
   String _errorMessage = '';
   bool _isLoading = false;
+  bool _isPasswordVisible = false;
+
+  @override
+  void dispose() {
+    _emailController.dispose();
+    _passwordController.dispose();
+    _passwordFocusNode.dispose();
+    _signInButtonFocusNode.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text("Login")),
+      appBar: AppBar(
+        title: const Text("Login"),
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back),
+          onPressed: () => Navigator.of(context).pop(),
+        ),
+      ),
       body: Center(
         child: Padding(
           padding: const EdgeInsets.all(16.0),
@@ -39,14 +57,35 @@ class _LoginScreenState extends State<LoginScreen> {
                   decoration: const InputDecoration(labelText: 'Email'),
                   validator: (value) =>
                       value!.isEmpty ? 'Please enter your email' : null,
+                  textInputAction: TextInputAction.next,
+                  onFieldSubmitted: (_) {
+                    FocusScope.of(context).requestFocus(_passwordFocusNode);
+                  },
                 ),
                 const SizedBox(height: 16),
                 TextFormField(
                   controller: _passwordController,
-                  decoration: const InputDecoration(labelText: 'Password'),
-                  obscureText: true,
+                  focusNode: _passwordFocusNode,
+                  decoration: InputDecoration(
+                    labelText: 'Password',
+                    suffixIcon: IconButton(
+                      icon: Icon(
+                        _isPasswordVisible
+                            ? Icons.visibility
+                            : Icons.visibility_off,
+                      ),
+                      onPressed: () {
+                        setState(() {
+                          _isPasswordVisible = !_isPasswordVisible;
+                        });
+                      },
+                    ),
+                  ),
+                  obscureText: !_isPasswordVisible,
                   validator: (value) =>
                       value!.isEmpty ? 'Please enter your password' : null,
+                  textInputAction: TextInputAction.done,
+                  onFieldSubmitted: (_) => _signIn(),
                 ),
                 const SizedBox(height: 24),
                 if (_errorMessage.isNotEmpty)
@@ -60,6 +99,7 @@ class _LoginScreenState extends State<LoginScreen> {
                 _isLoading
                     ? const CircularProgressIndicator()
                     : ElevatedButton.icon(
+                        focusNode: _signInButtonFocusNode,
                         icon: const Icon(Icons.login),
                         label: const Text("Sign In"),
                         onPressed: _signIn,

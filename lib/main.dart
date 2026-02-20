@@ -6,6 +6,7 @@ import 'package:lzprices/integrations/supabase_service.dart';
 import 'package:lzprices/screens/login_screen.dart';
 import 'package:lzprices/screens/search_page.dart';
 import 'package:lzprices/service_locator.dart';
+import 'package:lzprices/services/settings_service.dart';
 import 'package:lzprices/viewmodels/search_page_view_model.dart';
 import 'package:provider/provider.dart';
 
@@ -17,6 +18,9 @@ void main() async {
   await Firebase.initializeApp(
     options: DefaultFirebaseOptions.currentPlatform,
   );
+
+  // Initialize Settings Service
+  await SettingsService().initialize();
 
   // Initialize the database
   db = AppDatabase();
