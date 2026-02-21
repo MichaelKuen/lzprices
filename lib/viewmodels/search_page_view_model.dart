@@ -3,11 +3,14 @@ import 'package:flutter/material.dart';
 import 'package:lzprices/models/product.dart';
 import 'package:lzprices/repositories/product_repository.dart';
 import 'package:lzprices/service_locator.dart';
+import 'package:lzprices/services/permissions_service.dart';
 
 enum SortOption { none, priceAsc, priceDesc }
 
 class SearchPageViewModel extends ChangeNotifier {
   final ProductRepository _productRepository = sl<ProductRepository>();
+  final PermissionsService _permissionsService = sl<PermissionsService>();
+
   Timer? _debounce;
 
   List<Product> _searchResults = [];
@@ -33,17 +36,30 @@ class SearchPageViewModel extends ChangeNotifier {
 
   final TextEditingController searchController = TextEditingController();
 
+  Map<String, dynamic> _permissions = {};
+  Map<String, dynamic> get permissions => _permissions;
+
+  StreamSubscription<Map<String, dynamic>>? _permissionsSub;
+
   SearchPageViewModel() {
     _fetchCategories();
     searchController.addListener(() {
       _onSearchChanged(searchController.text);
     });
+
+    // Subscribe to permissions stream
+    _permissionsSub =
+        _permissionsService.permissionsStream.listen((perms) {
+          _permissions = perms;
+          notifyListeners();
+        });
   }
 
   @override
   void dispose() {
     _debounce?.cancel();
     searchController.dispose();
+    _permissionsSub?.cancel();
     super.dispose();
   }
 
@@ -125,15 +141,18 @@ class SearchPageViewModel extends ChangeNotifier {
     notifyListeners();
 
     try {
-      List<Product> results = await _productRepository.searchProducts(searchTerm,
-          categories: categoriesToSearch);
+      List<Product> results = await _productRepository.searchProducts(
+        searchTerm,
+        categories: categoriesToSearch,
+      );
 
       if (_activeSort == SortOption.priceAsc) {
         results.sort((a, b) =>
             (a.price ?? double.maxFinite)
                 .compareTo(b.price ?? double.maxFinite));
       } else if (_activeSort == SortOption.priceDesc) {
-        results.sort((a, b) => (b.price ?? -1).compareTo(a.price ?? -1));
+        results.sort(
+                (a, b) => (b.price ?? -1).compareTo(a.price ?? -1));
       }
 
       _searchResults = results;
@@ -145,9 +164,10 @@ class SearchPageViewModel extends ChangeNotifier {
     }
   }
 
-  // New: public filteredProducts getter
+  /// Public getter for UI to access filtered products.
   List<Product> get filteredProducts {
-    // Here you could apply user permissions if needed (retail/installer/wholesale)
+    // Here you could filter based on permissions if needed.
+    // For example, hide certain price fields if the user lacks permission.
     return _searchResults;
   }
 }

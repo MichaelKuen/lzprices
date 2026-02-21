@@ -3,15 +3,24 @@ import 'package:lzprices/models/product.dart';
 import 'package:lzprices/viewmodels/search_page_view_model.dart';
 import 'package:lzprices/screens/settings_screen.dart';
 import 'package:lzprices/services/auth_service.dart';
+import 'package:lzprices/services/permissions_service.dart';
 import 'package:provider/provider.dart';
+import 'package:lzprices/service_locator.dart';
 
 class SearchPage extends StatelessWidget {
   const SearchPage({super.key});
 
   @override
   Widget build(BuildContext context) {
-    return ChangeNotifierProvider<SearchPageViewModel>(
-      create: (_) => SearchPageViewModel(),
+    return MultiProvider(
+      providers: [
+        ChangeNotifierProvider<SearchPageViewModel>(
+            create: (_) => SearchPageViewModel()),
+        StreamProvider<Map<String, dynamic>>(
+          create: (_) => sl<PermissionsService>().permissionsStream,
+          initialData: const {},
+        ),
+      ],
       child: const _SearchPageBody(),
     );
   }
@@ -23,7 +32,15 @@ class _SearchPageBody extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final viewModel = context.watch<SearchPageViewModel>();
+    final permissions = context.watch<Map<String, dynamic>>();
     final authService = AuthService();
+
+    // Permission flags
+    final canEdit = permissions['canEdit'] ?? false;
+    final canDelete = permissions['canDelete'] ?? false;
+    final showPrice = permissions['showPrice'] ?? true;
+    final showInstallerPrice = permissions['showInstallerPrice'] ?? false;
+    final showWholesalePrice = permissions['showWholesalePrice'] ?? false;
 
     return Scaffold(
       appBar: AppBar(
@@ -88,12 +105,9 @@ class _SearchPageBody extends StatelessWidget {
             child: DropdownButton<SortOption>(
               value: viewModel.activeSort,
               items: const [
-                DropdownMenuItem(
-                    value: SortOption.none, child: Text('No Sort')),
-                DropdownMenuItem(
-                    value: SortOption.priceAsc, child: Text('Price Asc')),
-                DropdownMenuItem(
-                    value: SortOption.priceDesc, child: Text('Price Desc')),
+                DropdownMenuItem(value: SortOption.none, child: Text('No Sort')),
+                DropdownMenuItem(value: SortOption.priceAsc, child: Text('Price Asc')),
+                DropdownMenuItem(value: SortOption.priceDesc, child: Text('Price Desc')),
               ],
               onChanged: (option) {
                 if (option != null) {
@@ -103,13 +117,9 @@ class _SearchPageBody extends StatelessWidget {
             ),
           ),
           if (viewModel.isLoading)
-            const Expanded(
-              child: Center(child: CircularProgressIndicator()),
-            )
+            const Expanded(child: Center(child: CircularProgressIndicator()))
           else if (viewModel.errorMessage.isNotEmpty)
-            Expanded(
-              child: Center(child: Text(viewModel.errorMessage)),
-            )
+            Expanded(child: Center(child: Text(viewModel.errorMessage)))
           else if (viewModel.searchResults.isEmpty)
               const Expanded(
                 child: Center(child: Text('Select a product to see details')),
@@ -120,7 +130,14 @@ class _SearchPageBody extends StatelessWidget {
                   itemCount: viewModel.searchResults.length,
                   itemBuilder: (context, index) {
                     final product = viewModel.searchResults[index];
-                    return _buildProductCard(product);
+                    return _buildProductCard(
+                      product,
+                      canEdit,
+                      canDelete,
+                      showPrice,
+                      showInstallerPrice,
+                      showWholesalePrice,
+                    );
                   },
                 ),
               ),
@@ -129,15 +146,56 @@ class _SearchPageBody extends StatelessWidget {
     );
   }
 
-  Widget _buildProductCard(Product product) {
+  Widget _buildProductCard(
+      Product product,
+      bool canEdit,
+      bool canDelete,
+      bool showPrice,
+      bool showInstallerPrice,
+      bool showWholesalePrice,
+      ) {
+    List<Widget> priceWidgets = [];
+
+    if (showPrice && product.price != null) {
+      priceWidgets.add(Text('Retail: \$${product.price!.toStringAsFixed(2)}'));
+    }
+    if (showInstallerPrice && product.installerPrice != null) {
+      priceWidgets.add(Text('Installer: \$${product.installerPrice!.toStringAsFixed(2)}'));
+    }
+    if (showWholesalePrice && product.wholesalePrice != null) {
+      priceWidgets.add(Text('Wholesale: \$${product.wholesalePrice!.toStringAsFixed(2)}'));
+    }
+
     return Card(
       margin: const EdgeInsets.all(8),
       child: ListTile(
         title: Text(product.name),
-        subtitle: Text(product.sku ?? ''),
-        trailing: Text(product.price != null
-            ? '\$${product.price!.toStringAsFixed(2)}'
-            : 'N/A'),
+        subtitle: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            if (product.sku != null) Text('SKU: ${product.sku}'),
+            ...priceWidgets,
+          ],
+        ),
+        trailing: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            if (canEdit)
+              IconButton(
+                icon: const Icon(Icons.edit),
+                onPressed: () {
+                  // Implement edit functionality
+                },
+              ),
+            if (canDelete)
+              IconButton(
+                icon: const Icon(Icons.delete),
+                onPressed: () {
+                  // Implement delete functionality
+                },
+              ),
+          ],
+        ),
       ),
     );
   }

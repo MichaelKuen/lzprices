@@ -22,27 +22,53 @@ class _SettingsScreenState extends State<SettingsScreen> {
     _checkAdmin();
   }
 
+  /// Checks if the current user is an admin
   Future<void> _checkAdmin() async {
     final user = _auth.currentUser;
     if (user == null) return;
 
-    final doc =
-    await _firestore.collection('users').doc(user.uid).get();
-
-    if (doc.exists) {
+    try {
+      final doc = await _firestore.collection('users').doc(user.uid).get();
+      if (doc.exists) {
+        setState(() {
+          _isAdmin = doc['isAdmin'] ?? false;
+          _loading = false;
+        });
+      }
+    } catch (e) {
+      // Default to non-admin if error occurs
       setState(() {
-        _isAdmin = doc['isAdmin'] ?? false;
+        _isAdmin = false;
         _loading = false;
       });
     }
   }
 
+  /// Updates a single permission inside the user's permissions map
   Future<void> _updatePermission(
       String userId, String permissionKey, bool value) async {
-    await _firestore.collection('users').doc(userId).update({
-      'permissions.$permissionKey': value,
-    });
+    try {
+      await _firestore.collection('users').doc(userId).set(
+        {
+          'permissions': {permissionKey: value}
+        },
+        SetOptions(merge: true), // merge to avoid overwriting other permissions
+      );
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Failed to update permission: $e')),
+      );
+    }
   }
+
+  /// Default permissions keys to display for all users
+  final List<String> _defaultPermissionKeys = [
+    'canEdit',
+    'canDelete',
+    'showPrice',
+    'showInstallerPrice',
+    'showWholesalePrice',
+  ];
 
   @override
   Widget build(BuildContext context) {
@@ -67,6 +93,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
       body: StreamBuilder<QuerySnapshot>(
         stream: _firestore.collection('users').orderBy('email').snapshots(),
         builder: (context, snapshot) {
+          if (snapshot.hasError) {
+            return Center(child: Text('Error: ${snapshot.error}'));
+          }
+
           if (!snapshot.hasData) {
             return const Center(child: CircularProgressIndicator());
           }
@@ -78,28 +108,35 @@ class _SettingsScreenState extends State<SettingsScreen> {
             itemBuilder: (context, index) {
               final userDoc = users[index];
               final data = userDoc.data() as Map<String, dynamic>;
-
               final email = data['email'] ?? 'No email';
               final permissions =
               Map<String, dynamic>.from(data['permissions'] ?? {});
+
+              // Ensure all default keys exist for display
+              for (var key in _defaultPermissionKeys) {
+                if (!permissions.containsKey(key)) {
+                  permissions[key] = key == 'showPrice' ||
+                      key == 'showInstallerPrice' ||
+                      key == 'showWholesalePrice'
+                      ? true
+                      : false;
+                }
+              }
 
               return Card(
                 margin: const EdgeInsets.all(8),
                 child: ExpansionTile(
                   title: Text(email),
                   children: permissions.keys.map((permissionKey) {
-                    final bool currentValue =
-                        permissions[permissionKey] ?? false;
+                    final bool currentValue = permissions[permissionKey] ?? false;
 
                     return CheckboxListTile(
                       title: Text(permissionKey),
                       value: currentValue,
                       onChanged: (value) {
-                        _updatePermission(
-                          userDoc.id,
-                          permissionKey,
-                          value!,
-                        );
+                        if (value != null) {
+                          _updatePermission(userDoc.id, permissionKey, value);
+                        }
                       },
                     );
                   }).toList(),
