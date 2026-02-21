@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
-import '../services/settings_service.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key});
@@ -9,136 +10,104 @@ class SettingsScreen extends StatefulWidget {
 }
 
 class _SettingsScreenState extends State<SettingsScreen> {
-  final SettingsService _settingsService = SettingsService();
-  final Map<String, GlobalKey<FormState>> _formKeys = {
-    SettingsService.adminUsersKey: GlobalKey<FormState>(),
-    SettingsService.retailPriceUsersKey: GlobalKey<FormState>(),
-    SettingsService.installerPriceUsersKey: GlobalKey<FormState>(),
-    SettingsService.wholesalePriceUsersKey: GlobalKey<FormState>(),
-  };
-  final Map<String, TextEditingController> _controllers = {
-    SettingsService.adminUsersKey: TextEditingController(),
-    SettingsService.retailPriceUsersKey: TextEditingController(),
-    SettingsService.installerPriceUsersKey: TextEditingController(),
-    SettingsService.wholesalePriceUsersKey: TextEditingController(),
-  };
+  final FirebaseAuth _auth = FirebaseAuth.instance;
+  final FirebaseFirestore _firestore = FirebaseFirestore.instance;
 
-  Map<String, List<String>> _roleUsers = {
-    SettingsService.adminUsersKey: [],
-    SettingsService.retailPriceUsersKey: [],
-    SettingsService.installerPriceUsersKey: [],
-    SettingsService.wholesalePriceUsersKey: [],
-  };
+  bool _isAdmin = false;
+  bool _loading = true;
 
   @override
   void initState() {
     super.initState();
-    _loadUsers();
+    _checkAdmin();
   }
 
-  @override
-  void dispose() {
-    _controllers.values.forEach((controller) => controller.dispose());
-    super.dispose();
-  }
+  Future<void> _checkAdmin() async {
+    final user = _auth.currentUser;
+    if (user == null) return;
 
-  Future<void> _loadUsers() async {
-    final adminUsers = await _settingsService.getUsersForRole(SettingsService.adminUsersKey);
-    final retailUsers = await _settingsService.getUsersForRole(SettingsService.retailPriceUsersKey);
-    final installerUsers = await _settingsService.getUsersForRole(SettingsService.installerPriceUsersKey);
-    final wholesaleUsers = await _settingsService.getUsersForRole(SettingsService.wholesalePriceUsersKey);
-    setState(() {
-      _roleUsers[SettingsService.adminUsersKey] = adminUsers;
-      _roleUsers[SettingsService.retailPriceUsersKey] = retailUsers;
-      _roleUsers[SettingsService.installerPriceUsersKey] = installerUsers;
-      _roleUsers[SettingsService.wholesalePriceUsersKey] = wholesaleUsers;
-    });
-  }
+    final doc =
+    await _firestore.collection('users').doc(user.uid).get();
 
-  Future<void> _addUser(String roleKey) async {
-    if (_formKeys[roleKey]!.currentState!.validate()) {
-      final email = _controllers[roleKey]!.text;
-      await _settingsService.addUserToRole(email, roleKey);
-      _controllers[roleKey]!.clear();
-      await _loadUsers();
+    if (doc.exists) {
+      setState(() {
+        _isAdmin = doc['isAdmin'] ?? false;
+        _loading = false;
+      });
     }
   }
 
-  Future<void> _removeUser(String email, String roleKey) async {
-    await _settingsService.removeUserFromRole(email, roleKey);
-    await _loadUsers();
+  Future<void> _updatePermission(
+      String userId, String permissionKey, bool value) async {
+    await _firestore.collection('users').doc(userId).update({
+      'permissions.$permissionKey': value,
+    });
   }
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(title: const Text('Settings')),
-      body: Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: ListView(
-          children: [
-            _buildRoleSection(
-              context,
-              title: 'Admins',
-              roleKey: SettingsService.adminUsersKey,
-            ),
-            const SizedBox(height: 24),
-            _buildRoleSection(
-              context,
-              title: 'Retail Price Users',
-              roleKey: SettingsService.retailPriceUsersKey,
-            ),
-            const SizedBox(height: 24),
-            _buildRoleSection(
-              context,
-              title: 'Installer Price Users',
-              roleKey: SettingsService.installerPriceUsersKey,
-            ),
-            const SizedBox(height: 24),
-            _buildRoleSection(
-              context,
-              title: 'Wholesale Price Users',
-              roleKey: SettingsService.wholesalePriceUsersKey,
-            ),
-          ],
-        ),
-      ),
-    );
-  }
+    if (_loading) {
+      return const Scaffold(
+        body: Center(child: CircularProgressIndicator()),
+      );
+    }
 
-  Widget _buildRoleSection(BuildContext context, {required String title, required String roleKey}) {
-    final users = _roleUsers[roleKey] ?? [];
-    return Form(
-      key: _formKeys[roleKey],
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(title, style: Theme.of(context).textTheme.titleLarge),
-          const SizedBox(height: 8),
-          Row(
-            children: [
-              Expanded(
-                child: TextFormField(
-                  controller: _controllers[roleKey],
-                  decoration: const InputDecoration(labelText: 'Email'),
-                  validator: (value) => value!.isEmpty ? 'Please enter an email' : null,
+    if (!_isAdmin) {
+      return const Scaffold(
+        body: Center(
+          child: Text('You do not have permission to access this page'),
+        ),
+      );
+    }
+
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('User Permissions'),
+      ),
+      body: StreamBuilder<QuerySnapshot>(
+        stream: _firestore.collection('users').orderBy('email').snapshots(),
+        builder: (context, snapshot) {
+          if (!snapshot.hasData) {
+            return const Center(child: CircularProgressIndicator());
+          }
+
+          final users = snapshot.data!.docs;
+
+          return ListView.builder(
+            itemCount: users.length,
+            itemBuilder: (context, index) {
+              final userDoc = users[index];
+              final data = userDoc.data() as Map<String, dynamic>;
+
+              final email = data['email'] ?? 'No email';
+              final permissions =
+              Map<String, dynamic>.from(data['permissions'] ?? {});
+
+              return Card(
+                margin: const EdgeInsets.all(8),
+                child: ExpansionTile(
+                  title: Text(email),
+                  children: permissions.keys.map((permissionKey) {
+                    final bool currentValue =
+                        permissions[permissionKey] ?? false;
+
+                    return CheckboxListTile(
+                      title: Text(permissionKey),
+                      value: currentValue,
+                      onChanged: (value) {
+                        _updatePermission(
+                          userDoc.id,
+                          permissionKey,
+                          value!,
+                        );
+                      },
+                    );
+                  }).toList(),
                 ),
-              ),
-              IconButton(
-                icon: const Icon(Icons.add),
-                onPressed: () => _addUser(roleKey),
-              ),
-            ],
-          ),
-          const SizedBox(height: 8),
-          ...users.map((email) => ListTile(
-            title: Text(email),
-            trailing: IconButton(
-              icon: const Icon(Icons.delete),
-              onPressed: () => _removeUser(email, roleKey),
-            ),
-          )),
-        ],
+              );
+            },
+          );
+        },
       ),
     );
   }

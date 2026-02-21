@@ -68,6 +68,11 @@ class SearchPageViewModel extends ChangeNotifier {
     });
   }
 
+  void onSearchQueryChanged(String query) {
+    searchController.text = query;
+    _onSearchChanged(query);
+  }
+
   void onCategorySelected(bool selected, String category) {
     if (category == 'All') {
       _selectedCategories.clear();
@@ -88,7 +93,7 @@ class SearchPageViewModel extends ChangeNotifier {
     performSearch();
   }
 
-    void applyCategoryFilter(Set<String> newCategories) {
+  void applyCategoryFilter(Set<String> newCategories) {
     _selectedCategories.clear();
     _selectedCategories.addAll(newCategories);
     notifyListeners();
@@ -104,9 +109,9 @@ class SearchPageViewModel extends ChangeNotifier {
   Future<void> performSearch() async {
     final searchTerm = searchController.text.trim();
     final categoriesToSearch =
-        (_selectedCategories.contains('All') || _selectedCategories.isEmpty)
-            ? null
-            : _selectedCategories.toList();
+    (_selectedCategories.contains('All') || _selectedCategories.isEmpty)
+        ? null
+        : _selectedCategories.toList();
 
     if (searchTerm.isEmpty && categoriesToSearch == null) {
       _searchResults = [];
@@ -138,5 +143,11 @@ class SearchPageViewModel extends ChangeNotifier {
       _isLoading = false;
       notifyListeners();
     }
+  }
+
+  // New: public filteredProducts getter
+  List<Product> get filteredProducts {
+    // Here you could apply user permissions if needed (retail/installer/wholesale)
+    return _searchResults;
   }
 }
