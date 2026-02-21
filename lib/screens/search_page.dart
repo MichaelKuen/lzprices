@@ -15,7 +15,8 @@ class SearchPage extends StatelessWidget {
     return MultiProvider(
       providers: [
         ChangeNotifierProvider<SearchPageViewModel>(
-            create: (_) => SearchPageViewModel()),
+          create: (_) => SearchPageViewModel(),
+        ),
         StreamProvider<Map<String, dynamic>>(
           create: (_) => sl<PermissionsService>().permissionsStream,
           initialData: const {},
@@ -36,11 +37,11 @@ class _SearchPageBody extends StatelessWidget {
     final authService = AuthService();
 
     // Permission flags
-    final canEdit = permissions['canEdit'] ?? false;
-    final canDelete = permissions['canDelete'] ?? false;
-    final showPrice = permissions['showPrice'] ?? true;
-    final showInstallerPrice = permissions['showInstallerPrice'] ?? false;
-    final showWholesalePrice = permissions['showWholesalePrice'] ?? false;
+    final bool canEdit = permissions['canEdit'] ?? false;
+    final bool canDelete = permissions['canDelete'] ?? false;
+    final bool showPrice = permissions['showPrice'] ?? true;
+    final bool showInstallerPrice = permissions['showInstallerPrice'] ?? false;
+    final bool showWholesalePrice = permissions['showWholesalePrice'] ?? false;
 
     return Scaffold(
       appBar: AppBar(
@@ -67,6 +68,7 @@ class _SearchPageBody extends StatelessWidget {
       ),
       body: Column(
         children: [
+          // Search box
           Padding(
             padding: const EdgeInsets.all(8.0),
             child: TextField(
@@ -78,6 +80,8 @@ class _SearchPageBody extends StatelessWidget {
               ),
             ),
           ),
+
+          // Category chips
           SizedBox(
             height: 50,
             child: ListView.builder(
@@ -87,6 +91,7 @@ class _SearchPageBody extends StatelessWidget {
                 final category = viewModel.allCategories[index];
                 final isSelected =
                 viewModel.selectedCategories.contains(category);
+
                 return Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 4),
                   child: ChoiceChip(
@@ -100,14 +105,21 @@ class _SearchPageBody extends StatelessWidget {
               },
             ),
           ),
+
+          // Sort dropdown
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
             child: DropdownButton<SortOption>(
               value: viewModel.activeSort,
               items: const [
-                DropdownMenuItem(value: SortOption.none, child: Text('No Sort')),
-                DropdownMenuItem(value: SortOption.priceAsc, child: Text('Price Asc')),
-                DropdownMenuItem(value: SortOption.priceDesc, child: Text('Price Desc')),
+                DropdownMenuItem(
+                    value: SortOption.none, child: Text('No Sort')),
+                DropdownMenuItem(
+                    value: SortOption.priceAsc,
+                    child: Text('Price Asc')),
+                DropdownMenuItem(
+                    value: SortOption.priceDesc,
+                    child: Text('Price Desc')),
               ],
               onChanged: (option) {
                 if (option != null) {
@@ -116,6 +128,8 @@ class _SearchPageBody extends StatelessWidget {
               },
             ),
           ),
+
+          // Results
           if (viewModel.isLoading)
             const Expanded(child: Center(child: CircularProgressIndicator()))
           else if (viewModel.errorMessage.isNotEmpty)
@@ -130,6 +144,7 @@ class _SearchPageBody extends StatelessWidget {
                   itemCount: viewModel.searchResults.length,
                   itemBuilder: (context, index) {
                     final product = viewModel.searchResults[index];
+
                     return _buildProductCard(
                       product,
                       canEdit,
@@ -154,16 +169,24 @@ class _SearchPageBody extends StatelessWidget {
       bool showInstallerPrice,
       bool showWholesalePrice,
       ) {
-    List<Widget> priceWidgets = [];
+    final List<Widget> priceWidgets = [];
 
     if (showPrice && product.price != null) {
-      priceWidgets.add(Text('Retail: \$${product.price!.toStringAsFixed(2)}'));
+      priceWidgets.add(
+        Text('Retail: \$${product.price!.toStringAsFixed(2)}'),
+      );
     }
+
     if (showInstallerPrice && product.installerPrice != null) {
-      priceWidgets.add(Text('Installer: \$${product.installerPrice!.toStringAsFixed(2)}'));
+      priceWidgets.add(
+        Text('Installer: \$${product.installerPrice!.toStringAsFixed(2)}'),
+      );
     }
+
     if (showWholesalePrice && product.wholesalePrice != null) {
-      priceWidgets.add(Text('Wholesale: \$${product.wholesalePrice!.toStringAsFixed(2)}'));
+      priceWidgets.add(
+        Text('Wholesale: \$${product.wholesalePrice!.toStringAsFixed(2)}'),
+      );
     }
 
     return Card(
@@ -184,14 +207,14 @@ class _SearchPageBody extends StatelessWidget {
               IconButton(
                 icon: const Icon(Icons.edit),
                 onPressed: () {
-                  // Implement edit functionality
+                  // TODO: Implement edit functionality
                 },
               ),
             if (canDelete)
               IconButton(
                 icon: const Icon(Icons.delete),
                 onPressed: () {
-                  // Implement delete functionality
+                  // TODO: Implement delete functionality
                 },
               ),
           ],
