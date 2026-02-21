@@ -127,7 +127,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 margin: const EdgeInsets.all(8),
                 child: ExpansionTile(
                   title: Text(email),
-                  children: permissions.keys.map((permissionKey) {
+                  children: _defaultPermissionKeys.map((permissionKey) {
                     final bool currentValue = permissions[permissionKey] ?? false;
 
                     return CheckboxListTile(
