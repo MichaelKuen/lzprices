@@ -1,6 +1,8 @@
-import 'package:drift/drift.dart';
-import 'package:drift/web.dart';
+import 'package:drift/wasm.dart';
+import 'package:flutter/foundation.dart';
 
 QueryExecutor openConnection() {
-  return WebDatabase('db');
+  return WasmDatabase.supported()
+      ? WasmDatabase(dbName: 'db')
+      : WasmDatabase.serializable();
 }
