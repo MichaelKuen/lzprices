@@ -3,6 +3,7 @@ import 'package:intl/intl.dart';
 import 'package:lzprices/models/product.dart';
 import 'package:lzprices/viewmodels/search_page_view_model.dart';
 import 'package:lzprices/screens/settings_screen.dart';
+import 'package:lzprices/screens/create_users.dart';
 import 'package:lzprices/services/auth_service.dart';
 import 'package:lzprices/services/permissions_service.dart';
 import 'package:provider/provider.dart';
@@ -16,7 +17,8 @@ class SearchPage extends StatelessWidget {
     return MultiProvider(
       providers: [
         ChangeNotifierProvider<SearchPageViewModel>(
-            create: (_) => SearchPageViewModel()),
+          create: (_) => SearchPageViewModel(),
+        ),
         StreamProvider<Map<String, dynamic>>(
           create: (_) => sl<PermissionsService>().permissionsStream,
           initialData: const {},
@@ -31,40 +33,22 @@ class _SearchPageBody extends StatelessWidget {
   const _SearchPageBody({super.key});
 
   bool _isAccessAllowed(Map<String, dynamic> permissions) {
-    // Before permissions are loaded, deny access.
-    if (permissions.isEmpty) {
-      return false;
-    }
+    if (permissions.isEmpty) return false;
 
-    // Admin users always have access.
     final isAdmin = permissions['isAdmin'] as bool? ?? false;
-    if (isAdmin) {
-      return true;
-    }
+    if (isAdmin) return true;
 
-    // --- Day Check ---
     final now = DateTime.now();
     final currentDay = DateFormat('EEEE').format(now).toLowerCase();
 
-    // Get the accessDays map. If it doesn't exist or isn't a map, treat as no access days set.
     final accessDaysData = permissions['accessDays'];
-    if (accessDaysData is! Map) {
-      // If there's no accessDays map, there are no valid days to log in.
-      return false;
-    }
+    if (accessDaysData is! Map) return false;
 
-    // Check if access is explicitly granted for the current day.
-    // We check for `== true` to be strict. A missing day, null, or false all mean no access.
     final dayHasAccess = accessDaysData[currentDay] as bool? ?? false;
-    if (!dayHasAccess) {
-      return false;
-    }
+    if (!dayHasAccess) return false;
 
-    // --- Time Check ---
-    // If the day check passes, proceed to check the time window.
     final currentTime = TimeOfDay.fromDateTime(now);
 
-    // Safely get start and end time strings with defaults.
     final startTimeString = permissions['accessStartTime'] as String? ?? '00:00';
     final endTimeString = permissions['accessEndTime'] as String? ?? '23:59';
 
@@ -81,16 +65,13 @@ class _SearchPageBody extends StatelessWidget {
         minute: int.parse(endTimeParts[1]),
       );
 
-      final currentTimeInMinutes = currentTime.hour * 60 + currentTime.minute;
-      final startTimeInMinutes = startTime.hour * 60 + startTime.minute;
-      final endTimeInMinutes = endTime.hour * 60 + endTime.minute;
+      final currentMinutes = currentTime.hour * 60 + currentTime.minute;
+      final startMinutes = startTime.hour * 60 + startTime.minute;
+      final endMinutes = endTime.hour * 60 + endTime.minute;
 
-      // The user has access if the current time is within the allowed window.
-      return currentTimeInMinutes >= startTimeInMinutes &&
-          currentTimeInMinutes <= endTimeInMinutes;
-
-    } catch (e) {
-      // If time strings are malformed, deny access as a safe default.
+      return currentMinutes >= startMinutes &&
+          currentMinutes <= endMinutes;
+    } catch (_) {
       return false;
     }
   }
@@ -105,8 +86,9 @@ class _SearchPageBody extends StatelessWidget {
       return Scaffold(
         appBar: AppBar(
           title: const Text('Access Denied'),
-           actions: [
+          actions: [
             IconButton(
+              tooltip: 'Logout',
               icon: const Icon(Icons.logout),
               onPressed: () async {
                 await authService.signOut();
@@ -130,28 +112,45 @@ class _SearchPageBody extends StatelessWidget {
     }
 
     // Permission flags
-    final isAdmin = permissions['isAdmin'] ?? false;
-    final canEdit = permissions['canEdit'] ?? false;
-    final canDelete = permissions['canDelete'] ?? false;
-    final showPrice = permissions['showPrice'] ?? true;
-    final showInstallerPrice = permissions['showInstallerPrice'] ?? false;
-    final showWholesalePrice = permissions['showWholesalePrice'] ?? false;
+    final bool isAdmin = permissions['isAdmin'] ?? false;
+    final bool canEdit = permissions['canEdit'] ?? false;
+    final bool canDelete = permissions['canDelete'] ?? false;
+    final bool showPrice = permissions['showPrice'] ?? true;
+    final bool showInstallerPrice = permissions['showInstallerPrice'] ?? false;
+    final bool showWholesalePrice = permissions['showWholesalePrice'] ?? false;
 
     return Scaffold(
       appBar: AppBar(
         title: const Text('Search Products'),
         actions: [
-          if (isAdmin)
+          if (isAdmin) ...[
             IconButton(
+              tooltip: 'Create User',
+              icon: const Icon(Icons.person_add),
+              onPressed: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => const CreateUsersScreen(),
+                  ),
+                );
+              },
+            ),
+            IconButton(
+              tooltip: 'User Permissions',
               icon: const Icon(Icons.settings),
               onPressed: () {
                 Navigator.push(
                   context,
-                  MaterialPageRoute(builder: (_) => const SettingsScreen()),
+                  MaterialPageRoute(
+                    builder: (_) => const SettingsScreen(),
+                  ),
                 );
               },
             ),
+          ],
           IconButton(
+            tooltip: 'Logout',
             icon: const Icon(Icons.logout),
             onPressed: () async {
               await authService.signOut();
@@ -182,7 +181,7 @@ class _SearchPageBody extends StatelessWidget {
               itemBuilder: (context, index) {
                 final category = viewModel.allCategories[index];
                 final isSelected =
-                    viewModel.selectedCategories.contains(category);
+                viewModel.selectedCategories.contains(category);
                 return Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 4),
                   child: ChoiceChip(
@@ -201,11 +200,18 @@ class _SearchPageBody extends StatelessWidget {
             child: DropdownButton<SortOption>(
               value: viewModel.activeSort,
               items: const [
-                DropdownMenuItem(value: SortOption.none, child: Text('No Sort')),
                 DropdownMenuItem(
-                    value: SortOption.priceAsc, child: Text('Price Asc')),
+                  value: SortOption.none,
+                  child: Text('No Sort'),
+                ),
                 DropdownMenuItem(
-                    value: SortOption.priceDesc, child: Text('Price Desc')),
+                  value: SortOption.priceAsc,
+                  child: Text('Price Asc'),
+                ),
+                DropdownMenuItem(
+                  value: SortOption.priceDesc,
+                  child: Text('Price Desc'),
+                ),
               ],
               onChanged: (option) {
                 if (option != null) {
@@ -215,55 +221,65 @@ class _SearchPageBody extends StatelessWidget {
             ),
           ),
           if (viewModel.isLoading)
-            const Expanded(child: Center(child: CircularProgressIndicator()))
-          else if (viewModel.errorMessage.isNotEmpty)
-            Expanded(child: Center(child: Text(viewModel.errorMessage)))
-          else if (viewModel.searchResults.isEmpty)
             const Expanded(
-              child: Center(child: Text('Select a product to see details')),
+              child: Center(child: CircularProgressIndicator()),
             )
-          else
+          else if (viewModel.errorMessage.isNotEmpty)
             Expanded(
-              child: ListView.builder(
-                itemCount: viewModel.searchResults.length,
-                itemBuilder: (context, index) {
-                  final product = viewModel.searchResults[index];
-                  return _buildProductCard(
-                    product,
-                    canEdit,
-                    canDelete,
-                    showPrice,
-                    showInstallerPrice,
-                    showWholesalePrice,
-                  );
-                },
+              child: Center(child: Text(viewModel.errorMessage)),
+            )
+          else if (viewModel.searchResults.isEmpty)
+              const Expanded(
+                child: Center(child: Text('Select a product to see details')),
+              )
+            else
+              Expanded(
+                child: ListView.builder(
+                  itemCount: viewModel.searchResults.length,
+                  itemBuilder: (context, index) {
+                    final product = viewModel.searchResults[index];
+                    return _buildProductCard(
+                      product,
+                      canEdit,
+                      canDelete,
+                      showPrice,
+                      showInstallerPrice,
+                      showWholesalePrice,
+                    );
+                  },
+                ),
               ),
-            ),
         ],
       ),
     );
   }
 
   Widget _buildProductCard(
-    Product product,
-    bool canEdit,
-    bool canDelete,
-    bool showPrice,
-    bool showInstallerPrice,
-    bool showWholesalePrice,
-  ) {
+      Product product,
+      bool canEdit,
+      bool canDelete,
+      bool showPrice,
+      bool showInstallerPrice,
+      bool showWholesalePrice,
+      ) {
     List<Widget> priceWidgets = [];
 
     if (showPrice && product.price != null) {
-      priceWidgets.add(Text('Retail: \$${product.price!.toStringAsFixed(2)}'));
+      priceWidgets.add(
+        Text('Retail: \$${product.price!.toStringAsFixed(2)}'),
+      );
     }
+
     if (showInstallerPrice && product.installerPrice != null) {
-      priceWidgets
-          .add(Text('Installer: \$${product.installerPrice!.toStringAsFixed(2)}'));
+      priceWidgets.add(
+        Text('Installer: \$${product.installerPrice!.toStringAsFixed(2)}'),
+      );
     }
+
     if (showWholesalePrice && product.wholesalePrice != null) {
       priceWidgets.add(
-          Text('Wholesale: \$${product.wholesalePrice!.toStringAsFixed(2)}'));
+        Text('Wholesale: \$${product.wholesalePrice!.toStringAsFixed(2)}'),
+      );
     }
 
     return Card(
@@ -284,14 +300,14 @@ class _SearchPageBody extends StatelessWidget {
               IconButton(
                 icon: const Icon(Icons.edit),
                 onPressed: () {
-                  // Implement edit functionality
+                  // TODO: Implement edit functionality
                 },
               ),
             if (canDelete)
               IconButton(
                 icon: const Icon(Icons.delete),
                 onPressed: () {
-                  // Implement delete functionality
+                  // TODO: Implement delete functionality
                 },
               ),
           ],
