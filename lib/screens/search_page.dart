@@ -30,7 +30,7 @@ class SearchPage extends StatelessWidget {
 }
 
 class _SearchPageBody extends StatelessWidget {
-  const _SearchPageBody({super.key});
+  const _SearchPageBody();
 
   bool _isAccessAllowed(Map<String, dynamic> permissions) {
     if (permissions.isEmpty) return false;
