@@ -48,12 +48,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
   Future<void> _updatePermission(
       String userId, String permissionKey, bool value) async {
     try {
-      await _firestore.collection('users').doc(userId).set(
-        {
-          'permissions': {permissionKey: value}
-        },
-        SetOptions(merge: true), // merge to avoid overwriting other permissions
-      );
+      final fieldPath = 'permissions.$permissionKey';
+      await _firestore.collection('users').doc(userId).update({fieldPath: value});
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
@@ -65,14 +61,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
   /// Updates a user's access day permission
   Future<void> _updateAccessDay(String userId, String day, bool value) async {
     try {
-      await _firestore.collection('users').doc(userId).set(
-        {
-          'permissions': {
-            'accessDays': {day: value}
-          }
-        },
-        SetOptions(merge: true),
-      );
+      final fieldPath = 'permissions.accessDays.$day';
+      await _firestore.collection('users').doc(userId).update({fieldPath: value});
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
@@ -85,12 +75,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
   Future<void> _updateAccessTime(
       String userId, String timeKey, String value) async {
     try {
-      await _firestore.collection('users').doc(userId).set(
-        {
-          'permissions': {timeKey: value}
-        },
-        SetOptions(merge: true),
-      );
+      final fieldPath = 'permissions.$timeKey';
+      await _firestore.collection('users').doc(userId).update({fieldPath: value});
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
